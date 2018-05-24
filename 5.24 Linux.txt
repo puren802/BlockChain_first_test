@@ -1,0 +1,302 @@
+sudo apt-get update
+sudo apt-install curl
+curl -sL https://deb.nodesource.com/setup_7.x -o nodesource_setup.sh
+sudo bash nodesource_setup.sh
+sudo apt-get install nodejs
+sudo apt-get install npm
+
+node --version
+npm --version
+mkdir -p ethereum_voting_dapp/chapter1
+cd ethereum_voting_dapp/chapter1
+sudo apt-install git
+npm install ganache-cli web3@0.20.1 solc
+
+기본적으로 10개의 테스트 계정을 만들고 각 계정에 100개의 이더를 로드하여 테스트하기 편한 환경을 조성.
+
+
+솔리디티 스마트 계약
+이제 ganache가 설치되어 실행 중이므로, 첫 번째 스마트 계약을 작성해 봅시다.
+
+프로그래밍 언어인 솔리디티는 스마트 계약 작성을 위해 쓰이는 언어입니다. 
+객체 지향 프로그래밍에 익숙하다면, 솔리디티 스마트 계약 작성을 쉽게 배울 수 있을 것입니다. 
+자, 아래와 같은 투표 구조를 스마트 계약으로 작성해 봅시다.
+ (스마트 계약 자체는 객체지향 프로그래밍의 클래스라고 볼 수 있습니다) 
+-후보의 배열을 초기화하는 생성자. 
+-투표에 참여하는 메소드 (총 투표 수를 증가시킴)
+-후보자가 받은 총 투표 수를 반환하는 메소드
+
+생성자는 스마트 계약을 블록체인에 배포할 때 단 한 번만 호출됩니다. 코드 배포가 기존의 오래된 코드를 덮어쓰는 웹 환경과 달리, 블록체인에 배포된 코드는 변경할 수 없습니다. 즉, 스마트 계약을 갱신하고 다시 배포하면 이전 계약은 여전히 블록체인에 저장되어 있는 모든 데이터와 함께 그대로 유지되며, 새로 배포한 스마트 계약은 새로운 인스턴스로 생성됩니다.
+
+솔리디티 언어에 대한 자세한 가이드는 http://solidity.readthedocs.io/en/latest/index.html 를 참조하시기 바랍니다
+
+
+스마트계약 코드
+Voting.sol  (복사 붙여넣기 장치->게스트확장설치) chapter1디렉토리에
+
+pragma solidity ^0.4.18;
+
+
+contract Voting {
+
+
+  mapping (bytes32 => uint8) public votesReceived;
+
+  bytes32[] public candidateList;
+
+
+  function Voting(bytes32[] candidateNames) public {
+
+    candidateList = candidateNames;
+
+  }
+
+
+  function totalVotesFor(bytes32 candidate) view public returns (uint8) {
+
+    require(validCandidate(candidate));
+
+    return votesReceived[candidate];
+
+  }
+
+
+  function voteForCandidate(bytes32 candidate) public {
+
+    require(validCandidate(candidate));
+
+    votesReceived[candidate]  += 1;
+
+  }
+
+
+  function validCandidate(bytes32 candidate) view public returns (bool) {
+
+    for(uint i = 0; i < candidateList.length; i++) {
+
+      if (candidateList[i] == candidate) {
+
+        return true;
+
+      }
+
+    }
+
+    return false;
+
+   }
+
+}
+
+코드 설명
+1행: 코드를 컴파일할 컴파일러의 버전을 명시합니다
+
+3행: 맵핑(mapping)은 연관 배열 또는 해시와 같습니다. 맵핑은 bytes32 유형으로 저장된 후보의 이름과, 부호없는 정수형으로 저장된 해당 후보의 득표 수를 연관시킵니다
+
+4행: 대부분의 프로그래밍 언어는 votesRecieved.keys를 사용하여 모든 후보의 이름을 얻을 수 있습니다. 그러나 솔리디티에는 이러한 메소드가 없으므로, 각각의 후보를 별도로 관리해야 합니다.
+
+14행: votesReceived[key]는 기본적으로 0의 값을 가지므로, 이를 명시적으로 0으로 초기화하지 않고도 값을 0부터 증가시킬 수 있습니다
+
+각 함수가 접근 지정자를 가지고 있는 것을 볼 수 있습니다(오른쪽 예에서는 public이 접근 지정자에 해당됩니다). 이는, 외부의 스마트 계약이 함수를 호출할 수 있다는 것을 의미합니다. 외부에서 해당 함수를 호출할 수 없게 하고 싶다면 접근 지정자 private을 명시하면 됩니다. 접근 지정자를 명시하지 않으면 컴파일러가 경고를 발생시킬 것입니다. 이는 솔리디티 컴파일러에 최근에 업데이트된 기능으로, 사용자들이 private 함수를 제대로 지정하지 않아 중요한 함수를 외부에서 접근 가능하게 노출시키는 실수가 많았기에 이루어진 개선 사항입니다. 이곳에서 사용 가능한 다양한 접근 지정자에 대한 정보를 조회할 수 있습니다.
+
+일부 함수 중에는 한정자(modifier)의 일종인 view 가 달려 있는 것을 볼 수 있습니다. 이는 해당 함수가 읽기 전용이라고 컴파일러에 알려주는 기능을 합니다(예를 들어, 이 함수로는 블록체인의 상태를 변경할 수 없습니다). 사용 가능한 모든 한정자에 대한 정보는 이곳에서 조회할 수 있습니다.
+
+
+
+
+스마트 계약 컴ㅁ파일하기.
+
+node 명령을 실행하여 노드 콘솔에 액세스.
+Web3= require('web3')
+web3=new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+web3.eth.accounts
+code=fs.readFileSync('Voting.sol').toString()
+solc=require('solc')
+compiledCode=solc.compile(code)
+compiledCode로 확인
+
+1. compiledCode.contracts[':Voting'].bytecode: 이것은 Voting.sol의 소스코드가 컴파일될 때 생성되는 바이트 코드로써, 실제로 블록체인에 배포될 코드입니다.
+2. compiledCode.contracts[':Voting'].interface: 스마트 계약의 인터페이스, 또는 템플릿(ABI 정의라고도 불림)으로써, 스마트 계약 내에서 어떤 메소드가 사용 가능한지를 알려줍니다. 앞으로 스마트 계약과 상호작용해야 할 때마다 이 ABI 정의가 필요합니다. ABI에 대한 자세한 내용은 이 링크를 참조하세요.
+
+
+배포
+ABI 정의를 전달하여 스마트 계약 객체 VotingContract를 만들어야 합니다. 객체를 생성하고 나면 이를 사용하여 블록체인에 스마트 계약을 배포하고 실행할 것입니다.
+
+VotingContract.new 는 스마트 계약을 블록체인에 배포합니다.
+첫 번째 인자는 투표에서 경쟁할 후보자들이 담긴 배열로, 이해하기 쉬운 편입니다. 두 번째 인자는 여러 가지를 담고 있는 해시인데, 지금부터 여기에 대해 살펴보겠습니다:
+
+data: 이것은 우리가 블록체인에 배포한 바이트 코드로, 컴파일된 상태입니다.
+from: 블록체인은 누가 계약을 배포했는지 그 기록을 남깁니다. 이번 실습에서는 web3.eth.accounts를 호출하여 이 계약의 소유자가 되는 첫 번째 계정을 고를 것입니다. web3.eth.accounts는 테스트 블록체인을 시작할 때 ganache가 생성한 10개의 테스트 계정 배열을 반환합니다. 물론, 실제 블록체인에서는 아무 계정이나 사용해서는 안되며 트랜잭션을 시작하기 전에 사용할 계정의 소유권을 가지고 잠금을 해제해야 합니다. 실제 블록체인 상에 계정을 만들 때에는 암호(passphrase)를 묻는 메시지가 표시되며, 이는 해당 계정의 소유권을 증명하는 데 사용됩니다. 이러한 자세한 방법은 다음 절에서 다룰 예정입니다. 기본적으로 ganache는 편의를 위해 10개의 테스트 계정을 모두 잠금 해제합니다.
+gas: 블록체인과 상호작용하려면 비용이 듭니다. 이 비용은 블록체인 상에서 코드를 올리고 가동시키는 일을 실제로 담당하는 채굴자에게 지불됩니다. 블록체인에 코드를 올리기 위한 수수료를 직접 설정할 수 있으며 여기에 해당하는 값이 바로 '가스(gas)'입니다. 'from' 계정에 들어있는 이더 잔고가 가스 지불에 사용되며, 가스 가격은 네트워크에 의해 설정됩니다.
+
+이제 스마트 계약을 배포하고 계약과 상호작용하는 데 사용할 수 있는 스마트 계약 인스턴스(contractInstance 변수)를 확보했습니다. 
+블록체인에는 수십만 개의 스마트 계약이 배포되어 있습니다. 그렇다면 블록체인에서 자신의 계약을 어떻게 식별할까요?
+Answer: deployedContract.address. 자신이 배포한 스마트 계약과 상호작용하려면, 배포된 계약의 주소에 해당하는 deployedContract.address 및 ABI 정의가 필요합니다.
+
+
+> abiDefinition = JSON.parse(compiledCode.contracts[':Voting'].interface)
+> VotingContract = web3.eth.contract(abiDefinition)
+> byteCode = compiledCode.contracts[':Voting'].bytecode
+> deployedContract = VotingContract.new(['Rama','Nick','Jose'],{data: byteCode, from: web3.eth.accounts[0], gas: 4700000})
+> deployedContract.address
+'0x0396d2b97871144f75ba9a9c8ae12bf6c019f610' <- Your address will be different
+> contractInstance = VotingContract.at(deployedContract.address)
+
+
+
+
+콘솔과 상호작용하기 - 후보자에게 투표하고 투표 수를 조회하기
+
+
+노드 콘솔에 접속해서 voteForCandidate 메소드 및 totalVotesFor 메소드를 호출하고 결과를 확인해 보세요.
+
+후보자에게 투표할 때마다 트랜잭션 ID가 반환됩니다: 예: ‘0xdedc7ae544c3dde74ab5a0b07422c5a51b5240603d31074f5b75c0ebc786bf53’). 이 트랜잭션 ID는 트랜잭션이 발생한 증거이며, ID를 통해 나중에 언제든지 이 트랜잭션을 다시 확인할 수 있습니다. 발생한 트랜잭션은 변경이 불가능한 불변성을 가집니다. 
+
+이 불변성은 이더리움과 같은 블록체인의 가장 큰 장점 중 하나입니다. 앞으로 이어지는 강좌에서 이 불변성을 활용하는 애플리케이션을 만들어 볼 것입니다.
+
+> contractInstance.totalVotesFor.call('Rama')
+{ [String: '0'] s: 1, e: 0, c: [ 0 ] }             //{ [String: '0'] s: 1, e: 0, c: [ 0 ] } 은 숫자 0의 과학 표기법입니다.
+> contractInstance.voteForCandidate('Rama', {from: web3.eth.accounts[0]})
+'0xdedc7ae544c3dde74ab5a0b07422c5a51b5240603d31074f5b75c0ebc786bf53'
+> contractInstance.voteForCandidate('Rama', {from: web3.eth.accounts[0]})
+'0x02c054d238038d68b65d55770fabfca592a5cf6590229ab91bbe7cd72da46de9'
+> contractInstance.voteForCandidate('Rama', {from: web3.eth.accounts[0]})
+'0x3da069a09577514f2baaa11bc3015a16edf26aad28dffbcd126bde2e71f2b76f'
+> contractInstance.totalVotesFor.call('Rama').toLocaleString()
+'3'
+
+
+웹 상호작용
+
+프로젝트 폴더에 index.html과 index.js 생성
+index.html
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+ <title>Hello World DApp</title>
+
+ <link href='https://fonts.googleapis.com/css?family=Open Sans:400,700' rel='stylesheet' type='text/css'>
+
+ <link href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css' rel='stylesheet' type='text/css'>
+
+</head>
+
+<body class="container">
+
+ <h1>A Simple Hello World Voting Application</h1>
+
+ <div class="table-responsive">
+
+  <table class="table table-bordered">
+
+   <thead>
+
+    <tr>
+
+     <th>Candidate</th>
+
+     <th>Votes</th>
+
+    </tr>
+
+   </thead>
+
+   <tbody>
+
+    <tr>
+
+     <td>Rama</td>
+
+     <td id="candidate-1"></td>
+
+    </tr>
+
+    <tr>
+
+     <td>Nick</td>
+
+     <td id="candidate-2"></td>
+
+    </tr>
+
+    <tr>
+
+     <td>Jose</td>
+
+     <td id="candidate-3"></td>
+
+    </tr>
+
+   </tbody>
+
+  </table>
+
+ </div>
+
+ <input type="text" id="candidate" />
+
+ <a href="#" onclick="voteForCandidate()" class="btn btn-primary">Vote</a>
+
+</body>
+
+<script src="https://cdn.rawgit.com/ethereum/web3.js/develop/dist/web3.js"></script>
+
+<script src="https://code.jquery.com/jquery-3.1.1.slim.min.js"></script>
+
+<script src="./index.js"></script>
+
+</html>
+
+
+index.js
+web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+
+abi = JSON.parse('[{"constant":false,"inputs":[{"name":"candidate","type":"bytes32"}],"name":"totalVotesFor","outputs":[{"name":"","type":"uint8"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"candidate","type":"bytes32"}],"name":"validCandidate","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"","type":"bytes32"}],"name":"votesReceived","outputs":[{"name":"","type":"uint8"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"x","type":"bytes32"}],"name":"bytes32ToString","outputs":[{"name":"","type":"string"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"","type":"uint256"}],"name":"candidateList","outputs":[{"name":"","type":"bytes32"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"candidate","type":"bytes32"}],"name":"voteForCandidate","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"contractOwner","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"inputs":[{"name":"candidateNames","type":"bytes32[]"}],"payable":false,"type":"constructor"}]')
+
+VotingContract = web3.eth.contract(abi);
+
+contractInstance = VotingContract.at('0x329f5c190380ebcf640a90d06eb1db2d68503a53');
+
+candidates = {"Rama": "candidate-1", "Nick": "candidate-2", "Jose": "candidate-3"}
+
+
+function voteForCandidate(candidate) {
+
+ candidateName = $("#candidate").val();
+
+ try {
+
+  contractInstance.voteForCandidate(candidateName, {from: web3.eth.accounts[0]}, function() {
+
+   let div_id = candidates[candidateName];
+
+   $("#"+div_id).html(contractInstance.totalVotesFor.call(candidateName).toString());
+
+  });
+
+ } catch (err) {
+
+ }
+
+}
+
+
+$(document).ready(function() {
+
+ candidateNames = Object.keys(candidates);
+
+ for (var i = 0; i < candidateNames.length; i++) {
+
+  let name = candidateNames[i];
+
+  let val = contractInstance.totalVotesFor.call(name).toString()
+
+  $("#"+candidates[name]).html(val);
+
+ }
+
+});
+
